@@ -1,0 +1,89 @@
+/# substituições ao código original:
+1 - caixa de diálogo sobre CAPS LOCK virou comentário
+2 - caixa de diálogo com inserção de data automatizada (substituição de variável 'hoje' para 'data'
+3 - leitura das colunas de cópia da planilha do drive - respostas ao formulário web
+4-  tratamento de pontos '.' e barra '/' nos dados funcionais#/
+DISABLE WebAutomation.LaunchChrome.AttachToChromeByTitle TabTitle: $'''CSE - Conectividade Social / Empregador''' AttachTimeout: 5 BrowserInstance=> site_CAIXA
+/# Para que a ferramenta funcione corretamente, certifique-se:
+•estar logado no site CONECTIVIDADE SOCIAL;
+• estar na tela "COMUNICAR MOVIMENTAÇÃO DO SERVIDOR";
+•NÃO estar com o caps Lock ligado#/
+DateTime.GetCurrentDateTime.Local DateTimeFormat: DateTime.DateTimeFormat.DateOnly CurrentDateTime=> CurrentDateTime
+Text.CropText.CropTextBetweenFlags Text: CurrentDateTime FromFlag: $'''/''' ToFlag: $'''/''' IgnoreCase: False CroppedText=> mes IsFlagFound=> IsFlagFound
+Text.CropText.CropTextBeforeFlag Text: CurrentDateTime ToFlag: $'''/%mes%''' IgnoreCase: False CroppedText=> dia IsFlagFound=> IsFlagFound
+Text.CropText.CropTextAfterFlag Text: CurrentDateTime FromFlag: $'''%mes%/''' IgnoreCase: False CroppedText=> ano_hora IsFlagFound=> IsFlagFound
+Text.GetSubtext.GetSubtextFromStartTo Text: ano_hora NumberOfChars: 4 Subtext=> ano
+SET data TO $'''%dia%%mes%%ano%'''
+Excel.LaunchExcel.LaunchAndOpenUnderExistingProcess Path: $'''C:\\Users\\m6695506\\Desktop\\SEE-FGTS\\Formulário Coleta Dados FGTS.xlsx''' Visible: True ReadOnly: False Instance=> respostas_formulario
+Excel.SetActiveWorksheet.ActivateWorksheetByName Instance: respostas_formulario Name: $'''Respostas ao formulário 1'''
+LABEL próximo_servidor
+Excel.GetFirstFreeRowOnColumn Instance: respostas_formulario Column: $'''AA''' FirstFreeRowOnColumn=> Linha_execucao
+Excel.GetFirstFreeColumnRow Instance: respostas_formulario FirstFreeRow=> Qtd_a_fazer
+LOOP WHILE (Linha_execucao) < (Qtd_a_fazer)
+    Excel.ReadFromExcel.ReadCell Instance: respostas_formulario StartColumn: $'''C''' StartRow: Linha_execucao ReadAsText: False CellValue=> NOME_formulario
+    Excel.ReadFromExcel.ReadCell Instance: respostas_formulario StartColumn: $'''E''' StartRow: Linha_execucao ReadAsText: False CellValue=> MASP_original
+    @@copilotGeneratedAction: 'False'
+Scripting.RunPowershellScript.RunPowershellScript Script: $'''$textoEntrada = \"%MASP_original%\"
+$textoSubstituido = $textoEntrada.Replace(\"/\",\"\")
+
+Write-Output $textoSubstituido''' ScriptOutput=> MASP_formulario
+    Excel.ReadFromExcel.ReadCell Instance: respostas_formulario StartColumn: $'''F''' StartRow: Linha_execucao ReadAsText: False CellValue=> CPF_original
+    @@copilotGeneratedAction: 'False'
+Scripting.RunPowershellScript.RunPowershellScript Script: $'''$textoEntrada = \"%CPF_original%\"
+$textoSubstituido = $textoEntrada.Replace(\"-\",\"\")
+$textoFinal = $textoSubstituido.Replace(\".\",\"\")
+
+Write-Output $textoFinal''' ScriptOutput=> CPF_formulario
+    Excel.ReadFromExcel.ReadCell Instance: respostas_formulario StartColumn: $'''G''' StartRow: Linha_execucao ReadAsText: False CellValue=> PIS_original
+    @@copilotGeneratedAction: 'False'
+Scripting.RunPowershellScript.RunPowershellScript Script: $'''$textoEntrada = \"%PIS_original%\"
+$textoSubstituido = $textoEntrada.Replace(\"-\",\"\")
+$textoFinal = $textoSubstituido.Replace(\".\",\"\")
+
+Write-Output $textoFinal''' ScriptOutput=> PIS_formulario
+    Excel.LaunchExcel.LaunchAndOpenUnderExistingProcess Path: $'''C:\\Users\\Andre\\Documents\\SIGES-SEPLAG\\SEE_FGTS\\RELATÓRIO SEFIP POR PROCESSOS.xlsx''' Visible: True ReadOnly: False Instance=> processos
+    Excel.ReadFromExcel.ReadCells Instance: processos StartColumn: $'''E''' StartRow: 4 EndColumn: $'''E''' EndRow: 7518 ReadAsText: False FirstLineIsHeader: False RangeValue=> PIS_processos
+    @@copilotGeneratedAction: 'False'
+Scripting.RunPowershellScript.RunPowershellScript Script: $'''# Definir os parâmetros
+$excelFilePath = \"C:\\Caminho\\Para\\Sua\\Planilha.xlsx\"
+$sheetName = \"Planilha1\"
+$columnName = \"E\"
+$searchValue = \"%PIS_formulario%\"
+
+function FindValueInExcelColumn($excelFilePath, $sheetName, $columnName, $searchValue) {
+    # Carregar a planilha do Excel
+    $excelApp = New-Object -TypeName System.Windows.Automation.Excel
+    $excelApp.Visible = $false
+    $excelWorkbook = $excelApp.Workbooks.Open($excelFilePath)
+    $excelWorksheet = $excelWorkbook.Worksheets[$sheetName]
+
+    # Obter a coluna e o intervalo de linhas
+    $columnIndex = (Get-ExcelColumnNameIndex $columnName) - 1
+    $lastRow = $excelWorksheet.UsedRange.End(2).Row
+
+    # Localizar o valor na coluna
+    for ($row = 2; $row -le $lastRow; $row++) {
+        $cellValue = $excelWorksheet.Cells[$row, $columnIndex].Value
+        if ($cellValue -eq $searchValue) {
+            Write-Output \"%PIS_formulario%\"
+            return
+        }
+    }
+
+    # Valor não encontrado
+    Write-Output \"Valor não encontrado na coluna \'$columnName\'.\"
+}
+
+# Chamar a função
+FindValueInExcelColumn $excelFilePath $sheetName $columnName $searchValue''' ScriptOutput=> PIS_encontrado
+    IF PIS_formulario = PIS_encontrado THEN
+        Excel.WriteToExcel.WriteCell Instance: respostas_formulario Value: $'''Servidor com processo aberto''' Column: Linha_execucao Row: Qtd_a_fazer
+        Variables.IncreaseVariable Value: Linha_execucao IncrementValue: 1
+        GOTO próximo_servidor
+    ELSE
+        Variables.IncreaseVariable Value: Linha_execucao IncrementValue: 1
+        GOTO próximo_servidor
+    END
+END
+
+
