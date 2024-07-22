@@ -14,11 +14,12 @@ Text.CropText.CropTextBeforeFlag Text: CurrentDateTime ToFlag: $'''/%mes%''' Ign
 Text.CropText.CropTextAfterFlag Text: CurrentDateTime FromFlag: $'''%mes%/''' IgnoreCase: False CroppedText=> ano_hora IsFlagFound=> IsFlagFound
 Text.GetSubtext.GetSubtextFromStartTo Text: ano_hora NumberOfChars: 4 Subtext=> ano
 SET data TO $'''%dia%%mes%%ano%'''
-Excel.LaunchExcel.LaunchAndOpenUnderExistingProcess Path: $'''C:\\Users\\m6695506\\Desktop\\SEE-FGTS\\Formulário Coleta Dados FGTS.xlsx''' Visible: True ReadOnly: False Instance=> respostas_formulario
-Excel.SetActiveWorksheet.ActivateWorksheetByName Instance: respostas_formulario Name: $'''Respostas ao formulário 1'''
-LABEL próximo_servidor
-Excel.GetFirstFreeRowOnColumn Instance: respostas_formulario Column: $'''AA''' FirstFreeRowOnColumn=> Linha_execucao
+Excel.LaunchExcel.LaunchAndOpenUnderExistingProcess Path: $'''C:\\Users\\Andre\\Desktop\\SEE-FGTS\\Formulário Coleta Dados FGTS.xlsx''' Visible: True ReadOnly: False Instance=> respostas_formulario
+WAIT 10
+Excel.SetActiveWorksheet.ActivateWorksheetByName Instance: respostas_formulario Name: $'''sem-processo'''
+DISABLE LABEL próximo_servidor
 Excel.GetFirstFreeColumnRow Instance: respostas_formulario FirstFreeRow=> Qtd_a_fazer
+Excel.GetFirstFreeRowOnColumn Instance: respostas_formulario Column: $'''AA''' FirstFreeRowOnColumn=> Linha_execucao
 LOOP WHILE (Linha_execucao) < (Qtd_a_fazer)
     Excel.ReadFromExcel.ReadCell Instance: respostas_formulario StartColumn: $'''C''' StartRow: Linha_execucao ReadAsText: False CellValue=> NOME_formulario
     Excel.ReadFromExcel.ReadCell Instance: respostas_formulario StartColumn: $'''E''' StartRow: Linha_execucao ReadAsText: False CellValue=> MASP_original
@@ -27,27 +28,28 @@ Scripting.RunPowershellScript.RunPowershellScript Script: $'''$textoEntrada = \"
 $textoSubstituido = $textoEntrada.Replace(\"/\",\"\")
 
 Write-Output $textoSubstituido''' ScriptOutput=> MASP_formulario
-    Excel.ReadFromExcel.ReadCell Instance: respostas_formulario StartColumn: $'''F''' StartRow: Linha_execucao ReadAsText: False CellValue=> CPF_original
+    Excel.ReadFromExcel.ReadCell Instance: respostas_formulario StartColumn: $'''F''' StartRow: Linha_execucao ReadAsText: True CellValue=> CPF_original
     @@copilotGeneratedAction: 'False'
 Scripting.RunPowershellScript.RunPowershellScript Script: $'''$textoEntrada = \"%CPF_original%\"
 $textoSubstituido = $textoEntrada.Replace(\"-\",\"\")
 $textoFinal = $textoSubstituido.Replace(\".\",\"\")
 
 Write-Output $textoFinal''' ScriptOutput=> CPF_formulario
-    Excel.ReadFromExcel.ReadCell Instance: respostas_formulario StartColumn: $'''G''' StartRow: Linha_execucao ReadAsText: False CellValue=> PIS_original
+    Excel.ReadFromExcel.ReadCell Instance: respostas_formulario StartColumn: $'''G''' StartRow: Linha_execucao ReadAsText: True CellValue=> PIS_original
     @@copilotGeneratedAction: 'False'
 Scripting.RunPowershellScript.RunPowershellScript Script: $'''$textoEntrada = \"%PIS_original%\"
 $textoSubstituido = $textoEntrada.Replace(\"-\",\"\")
 $textoFinal = $textoSubstituido.Replace(\".\",\"\")
 
 Write-Output $textoFinal''' ScriptOutput=> PIS_formulario
-    Excel.LaunchExcel.LaunchAndOpenUnderExistingProcess Path: $'''C:\\Users\\Andre\\Documents\\SIGES-SEPLAG\\SEE_FGTS\\RELATÓRIO SEFIP POR PROCESSOS.xlsx''' Visible: True ReadOnly: False Instance=> processos
-    Excel.ReadFromExcel.ReadCells Instance: processos StartColumn: $'''E''' StartRow: 4 EndColumn: $'''E''' EndRow: 7518 ReadAsText: False FirstLineIsHeader: False RangeValue=> PIS_processos
+    Excel.LaunchExcel.LaunchAndOpenUnderExistingProcess Path: $'''C:\\Users\\Andre\\Desktop\\SEE-FGTS\\18715615000160_Rel_Incon_Cad.xlsx''' Visible: True ReadOnly: False Instance=> inconsistências
+    Excel.SetActiveWorksheet.ActivateWorksheetByName Instance: inconsistências Name: $'''situacao'''
+    Excel.ReadFromExcel.ReadCells Instance: inconsistências StartColumn: $'''D''' StartRow: 2 EndColumn: $'''D''' EndRow: 1477 ReadAsText: False FirstLineIsHeader: False RangeValue=> PIS_inconsistencias
     @@copilotGeneratedAction: 'False'
-Scripting.RunPowershellScript.RunPowershellScript Script: $'''# Definir os parâmetros
-$excelFilePath = \"C:\\Caminho\\Para\\Sua\\Planilha.xlsx\"
-$sheetName = \"Planilha1\"
-$columnName = \"E\"
+Scripting.RunPowershellScript.RunPowershellScriptAndFailOnTimeout Script: $'''# Definir os parâmetros
+$excelFilePath = \"%inconsistências%\"
+$sheetName = \"situacao\"
+$columnName = \"D\"
 $searchValue = \"%PIS_formulario%\"
 
 function FindValueInExcelColumn($excelFilePath, $sheetName, $columnName, $searchValue) {
@@ -75,15 +77,17 @@ function FindValueInExcelColumn($excelFilePath, $sheetName, $columnName, $search
 }
 
 # Chamar a função
-FindValueInExcelColumn $excelFilePath $sheetName $columnName $searchValue''' ScriptOutput=> PIS_encontrado
+FindValueInExcelColumn $excelFilePath $sheetName $columnName $searchValue''' Timeout: 15 ScriptOutput=> PIS_encontrado
     IF PIS_formulario = PIS_encontrado THEN
-        Excel.WriteToExcel.WriteCell Instance: respostas_formulario Value: $'''Servidor com processo aberto''' Column: Linha_execucao Row: Qtd_a_fazer
+        Excel.WriteToExcel.WriteCell Instance: respostas_formulario Value: $''' PROMOVER REGULARIZACAO JUNTO A CAIXA''' Column: $'''AA''' Row: Linha_execucao
         Variables.IncreaseVariable Value: Linha_execucao IncrementValue: 1
-        GOTO próximo_servidor
+        DISABLE GOTO próximo_servidor
     ELSE
+        Excel.WriteToExcel.WriteCell Instance: respostas_formulario Value: $'''Gerar chave do FGTS''' Column: $'''AA''' Row: Linha_execucao
         Variables.IncreaseVariable Value: Linha_execucao IncrementValue: 1
-        GOTO próximo_servidor
+        DISABLE GOTO próximo_servidor
     END
 END
+
 
 
