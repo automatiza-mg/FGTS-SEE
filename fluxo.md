@@ -1,3 +1,4 @@
+'''mermaid
 flowchart LR
     1(["Dados do usuário coletados via Forms"]) --> 2{"Possui processo na AGE?"}
     2 -- Sim ---> 2.1((("Servidor não tem direito ao FGTS")))
