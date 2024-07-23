@@ -13,6 +13,6 @@ flowchart LR
     style 4 stroke:#ffc000
     style 3.1 stroke:#2e75b6
     style 4.1 stroke:#2e75b6
-    style 5 stroke:#2e75b6
+    
 
 ´´´
